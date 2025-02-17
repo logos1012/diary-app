@@ -34,6 +34,9 @@ def create_app():
     # nginx나 다른 프록시 뒤에서 실행될 때 필요한 설정
     app.wsgi_app = ProxyFix(app.wsgi_app)
     
+    # 프록시 설정 추가
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+    
     # 확장 초기화
     db.init_app(app)
     login_manager.init_app(app)
