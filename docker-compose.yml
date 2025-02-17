@@ -10,6 +10,7 @@ services:
     environment:
       - FLASK_APP=app/main.py
       - FLASK_ENV=development
+      - FLASK_DEBUG=1
       - DATABASE_URL=postgresql://postgres:password@db:5432/flask_db
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
@@ -17,6 +18,7 @@ services:
       - ./app/static/uploads:/app/app/static/uploads
     networks:
       - diary-network
+    command: flask run --host=0.0.0.0 --port=5001 --debug
 
   db:
     image: postgres:13

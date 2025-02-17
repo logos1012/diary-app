@@ -11,7 +11,7 @@ auth = Blueprint('auth', __name__)
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('diary.index'))
+        return redirect(url_for('diary.home'))
     
     form = LoginForm()
     if form.validate_on_submit():
@@ -20,7 +20,7 @@ def login():
             login_user(user)
             next_page = request.args.get('next')
             if not next_page or urlparse(next_page).netloc != '':
-                next_page = url_for('diary.index')
+                next_page = url_for('diary.home')
             return redirect(next_page)
         flash('아이디 또는 비밀번호가 올바르지 않습니다.')
     
@@ -29,7 +29,7 @@ def login():
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('diary.index'))
+        return redirect(url_for('diary.home'))
     
     form = RegistrationForm()
     
