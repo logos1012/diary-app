@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}전체 일기{% endblock %}
+
+{% block extra_css %}
+<style>
+    .diary-list-container {
+        max-width: 1000px;
+        margin: 20px auto;
+        padding: 20px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .diary-list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .diary-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .diary-table th {
+        background-color: var(--secondary-color);
+        color: var(--text-primary);
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .diary-table td {
+        padding: 12px;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .diary-table tr:hover {
+        background-color: var(--secondary-color);
+    }
+
+    .diary-content {
+        color: var(--text-secondary);
+        max-width: 400px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .diary-title {
+        color: var(--primary-color);
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .diary-title:hover {
+        text-decoration: underline;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-edit {
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        background: transparent;
+    }
+
+    .btn-edit:hover {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-delete {
+        color: #EF4444;
+        border: 1px solid #EF4444;
+        background: transparent;
+    }
+
+    .btn-delete:hover {
+        background-color: #EF4444;
+        color: white;
+    }
+
+    .no-diaries {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-secondary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="diary-list-container">
+    <div class="diary-list-header">
+        <h1>전체 일기</h1>
+        <a href="{{ url_for('diary.create') }}" class="btn btn-primary">새 일기 쓰기</a>
+    </div>
+
+    {% if diaries %}
+        <table class="diary-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%">No</th>
+                    <th style="width: 25%">제목</th>
+                    <th style="width: 40%">내용</th>
+                    <th style="width: 15%">날짜</th>
+                    <th style="width: 15%">관리</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for diary in diaries %}
+                    <tr>
+                        <td>{{ loop.revindex }}</td>
+                        <td>
+                            <a href="{{ url_for('diary.view', id=diary.id) }}" class="diary-title">
+                                {{ diary.title }}
+                            </a>
+                        </td>
+                        <td class="diary-content">{{ diary.content[:50] }}{% if diary.content|length > 50 %}...{% endif %}</td>
+                        <td>{{ diary.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ url_for('diary.edit', id=diary.id) }}" class="btn btn-edit">수정</a>
+                                <button class="btn btn-delete" onclick="deleteDiary({{ diary.id }}, `{{ diary.title|replace('\'', '\\\'') }}`)">삭제</button>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="no-diaries">
+            작성된 일기가 없습니다.
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function deleteDiary(diaryId, diaryTitle) {
+    if (confirm(`"${diaryTitle}" 일기를 삭제하시겠습니까?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/diary/${diaryId}/delete`;  // URL을 직접 구성
+        
+        // CSRF 토큰 추가
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrf_token';
+        csrfToken.value = "{{ csrf_token() }}";
+        form.appendChild(csrfToken);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %} 

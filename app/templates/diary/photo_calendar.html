@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}사진 일기{% endblock %}
+
+{% block content %}
+<div class="calendar-container">
+    <div class="calendar-header">
+        <h2>
+            <a href="{{ url_for('diary.photo_calendar', year=prev_year, month=prev_month) }}" class="month-nav">&lt;</a>
+            <div class="date-selector">
+                <span id="currentDate" onclick="toggleDatePicker()">{{ year }}년 {{ month }}월</span>
+                <div id="datePicker" class="date-picker">
+                    <div class="date-picker-header">날짜 선택</div>
+                    <div class="date-picker-content">
+                        <select id="yearSelect">
+                            {% for y in range(year-10, year+11) %}
+                                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}년</option>
+                            {% endfor %}
+                        </select>
+                        <select id="monthSelect">
+                            {% for m in range(1, 13) %}
+                                <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}월</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="date-picker-footer">
+                        <button class="date-picker-btn cancel" onclick="closeDatePicker()">취소</button>
+                        <button class="date-picker-btn confirm" onclick="handleDateChange()">확인</button>
+                    </div>
+                </div>
+            </div>
+            <a href="{{ url_for('diary.photo_calendar', year=next_year, month=next_month) }}" class="month-nav">&gt;</a>
+        </h2>
+        <a href="{{ url_for('diary.create') }}" class="btn btn-primary">새 일기 쓰기</a>
+    </div>
+
+    <table class="calendar">
+        <thead>
+            <tr>
+                <th class="sun">일</th>
+                <th>월</th>
+                <th>화</th>
+                <th>수</th>
+                <th>목</th>
+                <th>금</th>
+                <th class="sat">토</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% with current_day = namespace(value=1) %}
+                {% for week in range((days_in_month + first_day_weekday + 6) // 7) %}
+                    <tr>
+                        {% for weekday in range(7) %}
+                            {% if (week == 0 and weekday < first_day_weekday) or current_day.value > days_in_month %}
+                                <td class="empty-cell"></td>
+                            {% else %}
+                                <td class="{% if current_day.value|string in photo_dict %}has-photos{% endif %} {% if year == today.year and month == today.month and current_day.value == today.day %}today{% endif %}">
+                                    <div class="cell-content">
+                                        <span class="date-number {% if weekday == 0 %}sun{% elif weekday == 6 %}sat{% endif %}">
+                                            {{ current_day.value }}
+                                        </span>
+                                        {% if current_day.value|string in photo_dict %}
+                                            <div class="photo-container">
+                                                {% for photo in photo_dict[current_day.value|string] %}
+                                                    <a href="{{ url_for('diary.view', id=photo.diary_id) }}" class="photo-item">
+                                                        <img src="{{ url_for('static', filename='uploads/' + photo.image_filename) }}" 
+                                                             alt="일기 이미지"
+                                                             class="diary-photo">
+                                                    </a>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    {% set current_day.value = current_day.value + 1 %}
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            {% endwith %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+function toggleDatePicker() {
+    const datePicker = document.getElementById('datePicker');
+    datePicker.classList.toggle('show');
+}
+
+function closeDatePicker() {
+    const datePicker = document.getElementById('datePicker');
+    datePicker.classList.remove('show');
+}
+
+function handleDateChange() {
+    const year = document.getElementById('yearSelect').value;
+    const month = document.getElementById('monthSelect').value;
+    window.location.href = `{{ url_for('diary.photo_calendar') }}?year=${year}&month=${month}`;
+}
+
+// 외부 클릭 시 date picker 닫기
+document.addEventListener('click', function(event) {
+    const datePicker = document.getElementById('datePicker');
+    const dateSelector = document.querySelector('.date-selector');
+    if (!dateSelector.contains(event.target)) {
+        datePicker.classList.remove('show');
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .calendar-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .calendar {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    .calendar th, .calendar td {
+        border: 1px solid #e2e8f0;
+        padding: 0;
+        position: relative;
+    }
+
+    /* 정사각형 셀 유지를 위한 스타일 */
+    .calendar td {
+        width: 14.28%;
+        position: relative;
+    }
+
+    .calendar td::before {
+        content: "";
+        display: block;
+        padding-top: 100%; /* 1:1 비율 유지 */
+    }
+
+    .cell-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .date-number {
+        font-size: 1em;
+        margin-bottom: 4px;
+    }
+
+    .photo-container {
+        flex-grow: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+    }
+
+    .photo-item {
+        width: 100%;
+        height: 100%;
+        display: block;
+        overflow: hidden;
+    }
+
+    .diary-photo {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.2s;
+    }
+
+    .photo-item:hover .diary-photo {
+        transform: scale(1.05);
+    }
+
+    .sun { color: #e53e3e; }
+    .sat { color: #3182ce; }
+    .today { background-color: #ebf8ff; }
+    .has-photos { background-color: var(--secondary-color); }
+    .empty-cell { background-color: #f7fafc; }
+
+    .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .month-nav {
+        color: var(--primary-color);
+        text-decoration: none;
+        padding: 0 10px;
+    }
+
+    .month-nav:hover {
+        color: var(--primary-dark);
+    }
+</style>
+{% endblock %} 

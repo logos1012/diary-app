@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}홈{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    .home-container {
+        width: 100%;
+        padding: 0;  /* 패딩 제거 */
+    }
+
+    .grid {
+        width: 100%;
+        margin: 0;
+        position: relative;
+        display: grid;  /* Masonry 대신 CSS Grid 사용 */
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));  /* 자동 반응형 그리드 */
+        gap: 20px;
+        padding: 20px;
+    }
+
+    .grid-item {
+        break-inside: avoid;
+        margin-bottom: 20px;
+    }
+
+    .month-divider {
+        grid-column: 1 / -1;  /* 전체 너비 차지 */
+        padding: 40px 20px 20px;
+        box-sizing: border-box;
+    }
+
+    .month-divider h2 {
+        font-size: 1rem;
+        font-weight: 400;
+        color: #333;
+        margin: 0;
+        letter-spacing: 0.05em;
+    }
+
+    .empty-month {
+        width: 100%;
+        padding: 40px;
+        text-align: center;
+        color: #666;
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
+    }
+
+    /* View Fullsize 오버레이 스타일 */
+    .view-fullsize {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+        background: rgba(0,0,0,0.5);
+        padding: 8px 12px;
+        border-radius: 3px;
+    }
+
+    .diary-card:hover .view-fullsize {
+        opacity: 1;
+    }
+
+    .diary-card {
+        display: block;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: none;
+        cursor: zoom-in;  /* 돋보기 커서 */
+    }
+
+    .diary-image-wrapper {
+        position: relative;
+        width: 100%;
+        padding-bottom: 100%;
+        overflow: hidden;
+    }
+
+    .diary-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.4s ease;
+    }
+
+    .diary-card:hover .diary-image {
+        transform: scale(1.03);
+    }
+
+    .diary-info {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 20px;
+        background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+        color: white;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 2;
+    }
+
+    .diary-card:hover .diary-info {
+        opacity: 1;
+    }
+
+    .diary-title {
+        margin: 0 0 8px 0;
+        font-size: 1.1rem;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        cursor: pointer;  /* 클릭 가능한 커서 */
+    }
+
+    .diary-title:hover {
+        text-decoration: underline;
+    }
+
+    .diary-date {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+
+    .zoom-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s ease, transform 0.2s ease;
+        z-index: 2;
+    }
+
+    .zoom-button i {
+        color: white;
+        font-size: 16px;
+    }
+
+    .diary-card:hover .zoom-button {
+        opacity: 1;
+    }
+
+    .zoom-button:hover {
+        transform: scale(1.1);
+        background: rgba(0, 0, 0, 0.9);
+    }
+
+    /* 이미지 팝업 스타일 */
+    .image-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        cursor: zoom-out;  /* 축소 커서 */
+    }
+
+    .image-popup.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .popup-content {
+        position: relative;
+        max-width: 95%;
+        max-height: 95vh;
+        transform: scale(0.95);
+        transition: transform 0.3s ease;
+    }
+
+    .image-popup.active .popup-content {
+        transform: scale(1);
+    }
+
+    .popup-image {
+        max-width: 100%;
+        max-height: 95vh;
+        object-fit: contain;
+    }
+
+    .close-popup {
+        position: absolute;
+        top: -40px;
+        right: 0;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <div class="grid">
+        {% for month in monthly_images %}
+            <div class="month-divider">
+                <h2>{{ month.year }}년 {{ month.month }}월</h2>
+            </div>
+            {% if month.diaries %}
+                {% for diary in month.diaries %}
+                    <div class="grid-item">
+                        <div class="diary-card" onclick="openImagePopup(event, '{{ url_for('static', filename='uploads/' + diary.image.filename) }}')">
+                            <div class="diary-image-wrapper">
+                                <img src="{{ url_for('static', filename='uploads/' + diary.image.filename) }}" 
+                                     alt="{{ diary.title }}"
+                                     class="diary-image"
+                                     loading="lazy">
+                                <div class="diary-info">
+                                    <h3 class="diary-title" onclick="goToDiary(event, '{{ url_for('diary.view', id=diary.id) }}')">
+                                        {{ diary.title }}
+                                    </h3>
+                                    <div class="diary-date">{{ diary.created_at.strftime('%Y-%m-%d') }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-month">
+                    이 달의 일기가 없습니다.
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 이미지 팝업 -->
+<div class="image-popup" id="imagePopup">
+    <div class="popup-content">
+        <img src="" alt="팝업 이미지" class="popup-image" id="popupImage">
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 이미지 로드 완료 후 처리
+    const images = document.querySelectorAll('.diary-image');
+    images.forEach(img => {
+        if (img.complete) {
+            img.classList.add('loaded');
+        } else {
+            img.addEventListener('load', function() {
+                img.classList.add('loaded');
+            });
+        }
+    });
+});
+
+function openImagePopup(event, imageUrl) {
+    const popup = document.getElementById('imagePopup');
+    const popupImage = document.getElementById('popupImage');
+    
+    popupImage.src = imageUrl;
+    popup.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImagePopup() {
+    const popup = document.getElementById('imagePopup');
+    popup.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function goToDiary(event, url) {
+    event.stopPropagation();  // 이미지 팝업 방지
+    window.location.href = url;
+}
+
+// 팝업 클릭 시 닫기
+document.getElementById('imagePopup').addEventListener('click', function() {
+    closeImagePopup();
+});
+
+// ESC 키로 팝업 닫기
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeImagePopup();
+    }
+});
+</script>
+{% endblock %} 

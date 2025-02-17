@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5001:5001"
+    depends_on:
+      - db
+    environment:
+      - FLASK_APP=app/main.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@db:5432/flask_db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - ./app/static/uploads:/app/app/static/uploads
+    networks:
+      - diary-network
+
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=flask_db
+    ports:
+      - "5432:5432"
+    networks:
+      - diary-network
+
+volumes:
+  postgres_data:
+
+networks:
+  diary-network:
+    driver: bridge 

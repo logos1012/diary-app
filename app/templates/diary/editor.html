@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}일기 {% if diary %}수정{% else %}작성{% endif %}{% endblock %}
+
+{% block extra_css %}
+<!-- SimpleMDE CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+<style>
+    .editor-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .image-preview {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        margin: 15px 0;
+    }
+    
+    .image-wrapper {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .image-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.2s;
+    }
+    
+    .image-wrapper:hover img {
+        transform: scale(1.05);
+    }
+    
+    .remove-image {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(255, 0, 0, 0.8);
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    
+    .CodeMirror {
+        height: 400px !important;
+    }
+
+    .image-actions {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .image-wrapper:hover .image-actions {
+        opacity: 1;
+    }
+
+    .representative-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9em;
+        color: var(--text-primary);
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="editor-container">
+    <h1>{% if diary %}일기 수정{% else %}새 일기 작성{% endif %}</h1>
+    
+    <form method="POST" enctype="multipart/form-data" id="diaryForm" onsubmit="return submitForm()">
+        {{ form.csrf_token }}
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.date.label }}
+            {{ form.date(class="form-control", type="date", value=(diary.created_at.strftime('%Y-%m-%d') if diary else form.date.data.strftime('%Y-%m-%d'))) }}
+            {% for error in form.date.errors %}
+                <span class="error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-group">
+            {{ form.title.label }}
+            {{ form.title(class="form-control") }}
+            {% for error in form.title.errors %}
+                <span class="error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-group">
+            {{ form.content.label }}
+            {{ form.content(id="editor") }}
+            {% for error in form.content.errors %}
+                <span class="error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-group">
+            {{ form.images.label }}
+            {{ form.images(class="form-control", id="image-upload", multiple=true, accept="image/*") }}
+            {% for error in form.images.errors %}
+                <span class="error">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <div id="imagePreview" class="image-preview">
+            {% if diary and diary.images %}
+                {% for image in diary.images %}
+                    <div class="image-wrapper" data-image-id="{{ image.id }}">
+                        <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" alt="일기 이미지">
+                        <button type="button" class="remove-image" onclick="removeImage({{ image.id }})">×</button>
+                        <div class="image-actions">
+                            <label class="representative-label">
+                                <input type="radio" name="representative_image" value="{{ image.id }}"
+                                       {% if image.is_representative %}checked{% endif %}
+                                       onchange="setRepresentativeImage({{ image.id }})">
+                                대표 사진
+                            </label>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn btn-primary" onclick="return submitForm()">저장하기</button>
+            <a href="{{ url_for('diary.index') }}" class="btn btn-secondary">취소</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- SimpleMDE -->
+<script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+    // SimpleMDE 초기화
+    window.simplemde = new SimpleMDE({  // 전역 변수로 변경
+        element: document.getElementById("editor"),
+        spellChecker: false,
+        status: false,
+        toolbar: ["bold", "italic", "heading", "|", 
+                 "quote", "unordered-list", "ordered-list", "|",
+                 "link", "image", "|",
+                 "preview", "side-by-side", "fullscreen", "|",
+                 "guide"]
+    });
+    
+    // 기존 내용이 있으면 에디터에 설정
+    const existingContent = document.getElementById('editor').value;
+    if (existingContent) {
+        simplemde.value(existingContent);
+    }
+
+    // 이미지 미리보기 처리
+    function handleImagePreview(event) {
+        const files = event.target.files;
+        const preview = document.getElementById('imagePreview');
+        
+        // 기존 미리보기 초기화
+        preview.innerHTML = '';
+        
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'image-wrapper';
+                
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = '업로드된 이미지';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-image';
+                removeBtn.type = 'button';
+                removeBtn.innerHTML = '×';
+                removeBtn.onclick = function() {
+                    wrapper.remove();
+                };
+
+                // 대표 이미지 선택 UI 추가
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'image-actions';
+                
+                const label = document.createElement('label');
+                label.className = 'representative-label';
+                
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'representative_image';
+                radio.value = 'new_' + Date.now();
+                
+                const labelText = document.createTextNode('대표 사진');
+                
+                label.appendChild(radio);
+                label.appendChild(labelText);
+                actionsDiv.appendChild(label);
+
+                wrapper.appendChild(img);
+                wrapper.appendChild(removeBtn);
+                wrapper.appendChild(actionsDiv);
+                preview.appendChild(wrapper);
+            };
+            
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // 이미지 업로드 이벤트 리스너 등록
+    document.getElementById('image-upload').addEventListener('change', handleImagePreview);
+});
+
+function submitForm() {
+    try {
+        // SimpleMDE 에디터 내용을 textarea에 동기화
+        const content = window.simplemde.value();
+        document.getElementById('editor').value = content;
+        
+        // 필수 필드 검증
+        const title = document.querySelector('input[name="title"]').value;
+        const date = document.querySelector('input[name="date"]').value;
+        
+        if (!title.trim()) {
+            alert('제목을 입력해주세요.');
+            return false;
+        }
+        
+        if (!date) {
+            alert('날짜를 선택해주세요.');
+            return false;
+        }
+        
+        if (!content.trim()) {
+            alert('내용을 입력해주세요.');
+            return false;
+        }
+        
+        console.log('제출할 데이터:', {
+            title: title,
+            date: date,
+            content: content
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('폼 제출 중 오류:', error);
+        alert('폼 제출 중 오류가 발생했습니다.');
+        return false;
+    }
+}
+
+// 이미지 삭제
+function removeImage(imageId) {
+    if (!confirm('이미지를 삭제하시겠습니까?')) {
+        return;
+    }
+    
+    fetch(`/diary/image/${imageId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            const wrapper = document.querySelector(`[data-image-id="${imageId}"]`);
+            if (wrapper) {
+                wrapper.remove();
+            }
+        } else {
+            throw new Error('이미지 삭제 실패');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('이미지 삭제에 실패했습니다.');
+    });
+}
+
+// 대표 사진 설정 함수
+function setRepresentativeImage(imageId) {
+    fetch(`/diary/image/${imageId}/set-representative`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('대표 사진 설정 실패');
+        // 성공 시 다른 라디오 버튼들의 선택 해제
+        document.querySelectorAll('input[name="representative_image"]').forEach(radio => {
+            if (radio.value != imageId) radio.checked = false;
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('대표 사진 설정에 실패했습니다.');
+    });
+}
+</script>
+{% endblock %}

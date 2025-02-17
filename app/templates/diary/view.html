@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}{{ diary.title }}{% endblock %}
+
+{% block content %}
+<div class="diary-view-container">
+    <div class="diary-header">
+        <h1>{{ diary.title }}</h1>
+        <div class="diary-meta">
+            작성일: {{ diary.created_at.strftime('%Y-%m-%d %H:%M') }}
+            {% if diary.updated_at != diary.created_at %}
+                (수정됨: {{ diary.updated_at.strftime('%Y-%m-%d %H:%M') }})
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="diary-content">
+        {% if diary.images %}
+            <div class="diary-images">
+                {% for image in diary.images %}
+                    <div class="image-wrapper">
+                        <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" 
+                             alt="일기 이미지" 
+                             class="diary-image">
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        <div class="diary-text markdown-body">
+            {{ diary.content_html|safe }}
+        </div>
+    </div>
+    
+    <div class="diary-actions">
+        <a href="{{ url_for('diary.edit', id=diary.id) }}" class="btn btn-primary">수정</a>
+        <form action="{{ url_for('diary.delete', id=diary.id) }}" method="POST" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('정말로 삭제하시겠습니까?')">삭제</button>
+        </form>
+        {% if request.referrer and 'list' in request.referrer %}
+            <a href="{{ url_for('diary.list_all') }}" class="btn btn-secondary">목록으로</a>
+        {% else %}
+            <a href="{{ url_for('diary.index') }}" class="btn btn-secondary">달력으로</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+<style>
+    .diary-view-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .diary-header {
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .diary-meta {
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .diary-images {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .image-wrapper {
+        aspect-ratio: 1;
+        overflow: hidden;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .diary-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .diary-text {
+        line-height: 1.6;
+    }
+    
+    .diary-actions {
+        margin-top: 30px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .markdown-body {
+        box-sizing: border-box;
+        min-width: 200px;
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 45px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    @media (max-width: 767px) {
+        .markdown-body {
+            padding: 15px;
+        }
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary {
+        background-color: #F3F4F6;
+        border: 1px solid #E5E7EB;
+        color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+        background-color: #E5E7EB;
+        border-color: #D1D5DB;
+        color: var(--text-primary);
+    }
+</style>
+{% endblock %} 
